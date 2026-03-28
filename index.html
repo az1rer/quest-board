@@ -624,18 +624,103 @@ const I={
 };
 
 let soundOn=true;
-const Au=(()=>{let c;const g=()=>{if(!c)c=new(window.AudioContext||window.webkitAudioContext)();if(c.state==='suspended')c.resume();return c};
-const t=(f,d,tp='square',v=.08,dl=0)=>{if(!soundOn)return;const x=g(),o=x.createOscillator(),gn=x.createGain();o.type=tp;o.frequency.setValueAtTime(f,x.currentTime+dl);gn.gain.setValueAtTime(v,x.currentTime+dl);gn.gain.exponentialRampToValueAtTime(.001,x.currentTime+dl+d);o.connect(gn);gn.connect(x.destination);o.start(x.currentTime+dl);o.stop(x.currentTime+dl+d)};
-return{
-  coin(){t(880,.06,'triangle',.07);t(1175,.1,'triangle',.07,.05)},
-  accept(){t(440,.06,'triangle',.08);t(554,.06,'triangle',.08,.05);t(659,.1,'triangle',.08,.1)},
-  complete(){t(659,.06,'triangle',.06);t(880,.06,'triangle',.06,.05);t(1047,.06,'triangle',.06,.1);t(1319,.14,'triangle',.08,.15)},
-  lvlUp(){[440,554,659,880,1047,1319].forEach((f,i)=>{t(f,.1,'triangle',.06,i*.05);t(f*1.5,.1,'sine',.03,i*.05)})},
-  streak(){t(554,.08,'sine',.06);t(659,.08,'sine',.06,.07);t(880,.08,'sine',.06,.14);t(1047,.14,'sine',.04,.21)},
-  buy(){t(659,.06,'sine',.06);t(440,.1,'sine',.04,.06)},
-  err(){t(180,.1,'sawtooth',.04);t(140,.14,'sawtooth',.03,.08)},
-  del(){t(350,.05,'triangle',.03);t(260,.08,'triangle',.02,.04)}
-}})();
+const Au=(()=>{
+  let c;
+  const g=()=>{if(!c)c=new(window.AudioContext||window.webkitAudioContext)();if(c.state==='suspended')c.resume();return c};
+
+  // soft filtered tone — warm, round, ASMR-like
+  const soft=(f,dur,vol=.06,dl=0,filt=2000)=>{
+    if(!soundOn)return;const x=g(),t=x.currentTime+dl;
+    const o=x.createOscillator(),gn=x.createGain(),fl=x.createBiquadFilter();
+    o.type='sine';o.frequency.setValueAtTime(f,t);
+    fl.type='lowpass';fl.frequency.setValueAtTime(filt,t);fl.Q.setValueAtTime(.7,t);
+    gn.gain.setValueAtTime(0,t);
+    gn.gain.linearRampToValueAtTime(vol,t+.01);
+    gn.gain.exponentialRampToValueAtTime(.001,t+dur);
+    o.connect(fl);fl.connect(gn);gn.connect(x.destination);
+    o.start(t);o.stop(t+dur);
+  };
+
+  // noise burst — soft click / pop feel
+  const noise=(dur=.04,vol=.03,dl=0,hiF=3000,loF=800)=>{
+    if(!soundOn)return;const x=g(),t=x.currentTime+dl;
+    const buf=x.createBuffer(1,x.sampleRate*dur,x.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);
+    const src=x.createBufferSource(),gn=x.createGain(),bp=x.createBiquadFilter();
+    src.buffer=buf;
+    bp.type='bandpass';bp.frequency.setValueAtTime((hiF+loF)/2,t);bp.Q.setValueAtTime(1.2,t);
+    gn.gain.setValueAtTime(vol,t);
+    gn.gain.exponentialRampToValueAtTime(.001,t+dur);
+    src.connect(bp);bp.connect(gn);gn.connect(x.destination);
+    src.start(t);
+  };
+
+  // chime — gentle bell-like with harmonics
+  const chime=(f,dur=.4,vol=.04,dl=0)=>{
+    if(!soundOn)return;const x=g(),t=x.currentTime+dl;
+    [1, 2.0, 3.0].forEach((h,i)=>{
+      const o=x.createOscillator(),gn=x.createGain(),fl=x.createBiquadFilter();
+      o.type='sine';o.frequency.setValueAtTime(f*h,t);
+      fl.type='lowpass';fl.frequency.setValueAtTime(3000/(i+1),t);
+      const v=vol/(i+1);
+      gn.gain.setValueAtTime(0,t);gn.gain.linearRampToValueAtTime(v,t+.008);
+      gn.gain.exponentialRampToValueAtTime(.001,t+dur);
+      o.connect(fl);fl.connect(gn);gn.connect(x.destination);
+      o.start(t);o.stop(t+dur);
+    });
+  };
+
+  return{
+    // soft tap — for every generic button/tab click
+    tap(){noise(.03,.025,0,4000,1500);soft(800,.06,.03,0,1200)},
+
+    // subtle pop — difficulty selection, toggles
+    pop(){noise(.035,.03,0,5000,2000);soft(660,.08,.035);soft(990,.1,.02,.04)},
+
+    // coin collect — sparkly, satisfying
+    coin(){chime(1318,.35,.04);chime(1568,.3,.03,.06);noise(.025,.02,.0,6000,3000)},
+
+    // quest accepted — warm ascending
+    accept(){soft(440,.12,.05);soft(554,.12,.05,.06);soft(659,.18,.06,.12);noise(.03,.02,.12,4000,1500)},
+
+    // quest complete — the big satisfying one: layered chimes + pop
+    complete(){
+      noise(.05,.04,0,5000,1500);
+      chime(659,.4,.05,0);chime(880,.35,.05,.07);chime(1047,.35,.05,.14);chime(1568,.5,.06,.2);
+      soft(330,.3,.03,.0,800);soft(440,.3,.03,.07,800);
+      noise(.04,.025,.22,6000,2500);
+    },
+
+    // level up — magical ascending cascade
+    lvlUp(){
+      [523,659,784,1047,1319,1568].forEach((f,i)=>{
+        chime(f,.5,.04,i*.07);
+        soft(f/2,.3,.02,i*.07,600);
+      });
+      noise(.06,.03,.42,5000,2000);
+      noise(.04,.02,.0,3000,1000);
+    },
+
+    // streak — warm glow
+    streak(){soft(440,.15,.04);soft(554,.15,.04,.08);soft(659,.15,.04,.16);chime(880,.4,.035,.24);noise(.03,.015,.24,4000,1500)},
+
+    // buy reward — satisfying cha-ching
+    buy(){noise(.04,.03,0,5000,2000);chime(784,.3,.04);chime(523,.35,.03,.08);soft(392,.2,.03,.05,900)},
+
+    // error — soft dull thud
+    err(){noise(.06,.04,0,800,200);soft(180,.12,.04,0,400);soft(150,.15,.03,.06,350)},
+
+    // delete — soft whoosh down
+    del(){noise(.05,.02,0,3000,800);soft(500,.08,.025);soft(350,.1,.02,.04,700)},
+
+    // tab switch — very subtle click
+    tabSwitch(){noise(.025,.02,0,6000,2500);soft(900,.04,.02,0,1500)},
+
+    // toggle — soft snap
+    toggle(){noise(.03,.025,0,5000,2000);soft(720,.06,.03);soft(1080,.08,.02,.03)}
+  };
+})();
 
 const Co=(()=>{const cv=document.getElementById('confetti'),c=cv.getContext('2d');let ps=[],run=false;
 const re=()=>{cv.width=innerWidth;cv.height=innerHeight};addEventListener('resize',re);re();
@@ -746,11 +831,12 @@ function goTab(name){
   document.querySelectorAll('.page').forEach(p=>{p.classList.remove('on')});
   const pg=$('pg-'+name);if(pg){pg.classList.add('on')}
   window.scrollTo({top:0,behavior:'instant'});
+  Au.tabSwitch();
 }
 document.querySelectorAll('.tb').forEach(t=>t.addEventListener('click',()=>goTab(t.dataset.p)));
 
 let diff='easy';
-document.querySelectorAll('.dif').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.dif').forEach(x=>x.classList.remove('on'));b.classList.add('on');diff=b.dataset.d}));
+document.querySelectorAll('.dif').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.dif').forEach(x=>x.classList.remove('on'));b.classList.add('on');diff=b.dataset.d;Au.pop()}));
 $('addB').addEventListener('click',addQ);$('qI').addEventListener('keydown',e=>{if(e.key==='Enter')addQ()});
 
 function addQ(){
@@ -781,8 +867,8 @@ function addRew(){const n=$('rN'),c=$('rC'),nm=n.value.trim(),cost=parseInt(c.va
 window.delR=function(id){S.rewards=S.rewards.filter(x=>x.id!==id);save();Au.del();render()};
 
 $('nameInp').addEventListener('input',function(){S.name=this.value.trim()||'Герой';save();$('hNm').textContent=S.name;$('hNm2').textContent=S.name});
-$('thRow').addEventListener('click',()=>{S.theme=S.theme==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',S.theme);updTog();save()});
-$('sndRow').addEventListener('click',()=>{soundOn=!soundOn;S.sound=soundOn;updTog();save()});
+$('thRow').addEventListener('click',()=>{S.theme=S.theme==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',S.theme);updTog();save();Au.toggle()});
+$('sndRow').addEventListener('click',()=>{soundOn=!soundOn;S.sound=soundOn;updTog();save();Au.toggle()});
 function updTog(){$('thTog').classList.toggle('on',S.theme==='dark');$('sndTog').classList.toggle('on',soundOn)}
 
 function spawnCoin(x,y){const el=document.createElement('div');el.className='fly-coin';el.innerHTML=I.coin;el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);setTimeout(()=>el.remove(),850)}
@@ -793,6 +879,12 @@ function $(id){return document.getElementById(id)}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function fD(d){try{return new Date(d+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}catch{return d}}
 function fDT(d){try{const t=new Date(d);return t.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' '+t.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}catch{return''}}
+// Global tap sound on interactive elements
+document.addEventListener('pointerdown',e=>{
+  const el=e.target.closest('.stat,.ach,.rc,.s-row,.hero,.home-qi');
+  if(el)Au.tap();
+});
+
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 load();render();
 </script>
