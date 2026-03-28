@@ -635,7 +635,11 @@ function spawnCoin(x,y){const el=document.createElement('div');el.className='fly
 function toast(ic,txt){const c=$('toasts'),t=document.createElement('div');t.className='toast';t.innerHTML=`<span>${ic}</span><span>${txt}</span>`;c.appendChild(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),250)},2200)}
 function showLU(lv){Au.lvlUp();Co.burst(innerWidth/2,innerHeight/3,70);const o=$('luO');$('luTxt').textContent='Уровень '+lv;o.classList.add('show');setTimeout(()=>o.classList.remove('show'),2600)}
 
-document.addEventListener('pointerdown',e=>{const el=e.target.closest('.stat,.ach,.rc,.s-row,.hi,.home-qi');if(el)Au.tap()});
+document.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.q-chk,.q-del,.buy,.rdel,.q-add,.ds,.tb,.tog,.reset-btn,.ava-opt,.ava-close,.hero-ava,.pf-ava,.edt'))return;
+  const el=e.target.closest('.stat,.ach,.hi,.home-qi');
+  if(el)Au.tap();
+});
 function $(id){return document.getElementById(id)}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function fD(d){try{return new Date(d+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}catch{return d}}
